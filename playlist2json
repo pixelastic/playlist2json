@@ -74,11 +74,11 @@ class YoutubePlaylistImporter
       url: node_text(node, 'xmlns:link', 'href'),
       published: published,
       thumbnail: node_text(node, 'media:thumbnail', 'url'),
-      thumbnail_width: node_text(node, 'media:thumbnail', 'width'),
-      thumbnail_height: node_text(node, 'media:thumbnail', 'height'),
+      thumbnail_width: node_text(node, 'media:thumbnail', 'width').to_f,
+      thumbnail_height: node_text(node, 'media:thumbnail', 'height').to_f,
       description: node_text(node, 'media:description'),
-      views: node_text(node, 'media:statistics', 'views'),
-      rating: node_text(node, 'media:starRating', 'average')
+      views: node_text(node, 'media:statistics', 'views').to_f,
+      rating: node_text(node, 'media:starRating', 'average').to_f
     }
   end
 
