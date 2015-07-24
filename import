@@ -1,0 +1,100 @@
+#!/usr/bin/env ruby
+require 'open-uri'
+require 'awesome_print'
+require 'uri'
+require 'nokogiri'
+require 'json'
+
+# Save a JSON representation of a Youtube playlist
+class YoutubePlaylistImporter
+  def initialize(*args)
+    @playlist_url = args[0]
+  end
+
+  def playlist_id
+    CGI.parse(URI(@playlist_url).query)['list'][0]
+  end
+
+  def distant_rss_url
+    "https://www.youtube.com/feeds/videos.xml?playlist_id=#{playlist_id}"
+  end
+
+  def local_rss_url
+    File.expand_path("./_cache/#{playlist_id}.xml")
+  end
+
+  def rss_url
+    url = local_rss_url
+    url = distant_rss_url unless File.exist?(url)
+    url
+  end
+
+  def rss_doc
+    content = open(rss_url) { |file| file.read }
+    # Save in local cache
+    unless File.exist?(local_rss_url)
+      File.open(local_rss_url, 'w') do |file|
+        file.write(content)
+      end
+    end
+    Nokogiri::XML(content)
+  end
+
+  def rss_nodes
+    rss_doc.root.xpath('//xmlns:entry')
+  end
+
+  def playlist_name
+    return @playlist_name unless @playlist_name.nil?
+    @playlist_name = rss_doc.root.xpath('./xmlns:title').text
+  end
+
+  def sanitize_filename(filename)
+    filename.gsub!(/([\?\*\|:;"“”<>])/, '')
+    filename.strip!
+    filename.gsub!('/', '')
+    filename.gsub!(/ {2,}/, ' ')
+    filename.gsub!('’', "'")
+    filename.gsub!(' ', '_')
+    filename
+  end
+
+  def node_text(node, tag, attr = nil)
+    tag = node.xpath(".//#{tag}")
+    return tag.text if attr.nil?
+    tag.attr(attr).text
+  end
+
+  def node_to_json(node)
+    published = DateTime.parse(node_text(node, 'xmlns:published')).to_time.to_i
+    {
+      objectID: node_text(node, 'yt:videoId'),
+      playlist_name: playlist_name,
+      title: node_text(node, 'xmlns:title'),
+      url: node_text(node, 'xmlns:link', 'href'),
+      published: published,
+      thumbnail: node_text(node, 'media:thumbnail', 'url'),
+      thumbnail_width: node_text(node, 'media:thumbnail', 'width'),
+      thumbnail_height: node_text(node, 'media:thumbnail', 'height'),
+      description: node_text(node, 'media:description'),
+      views: node_text(node, 'media:statistics', 'views'),
+      rating: node_text(node, 'media:starRating', 'average')
+    }
+  end
+
+
+  def save(items)
+    filename = File.expand_path("./json/#{sanitize_filename(playlist_name)}.json")
+    File.open(filename, 'w') do |file|
+      file.write(JSON.pretty_generate(items))
+    end
+    puts "File saved as #{filename}"
+  end
+
+  def run
+    puts "Parsing #{rss_url}"
+    items = rss_nodes.map { |node| node_to_json(node) }
+    save(items)
+  end
+end
+YoutubePlaylistImporter.new(*ARGV).run
