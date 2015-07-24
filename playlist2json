@@ -82,9 +82,9 @@ class YoutubePlaylistImporter
     }
   end
 
-
   def save(items)
-    filename = File.expand_path("./json/#{sanitize_filename(playlist_name)}.json")
+    filename = "./json/#{sanitize_filename(playlist_name)}.json"
+    filename = File.expand_path(filename)
     File.open(filename, 'w') do |file|
       file.write(JSON.pretty_generate(items))
     end
